@@ -1,10 +1,10 @@
 print("Mod Loaded")
 
 local boundaries = {
-    x1 = 5,
-    x2 = -5,
-    z1 = 5,
-    z2 = -5
+    x1 = 10,
+    x2 = -10,
+    z1 = 10,
+    z2 = -10
 }
 
 local defaultSpawn = {
@@ -14,9 +14,9 @@ local defaultSpawn = {
 }
 
 local aPlayer = {
-    playerobj = nil,
-    --boundaries = defaultBoundaries,
-    spawn = defaultSpawn
+    reference = nil,
+    configuration = nil,
+    initialised = false
 }
 
 local http_api = minetest.request_http_api()
@@ -41,8 +41,8 @@ minetest.chat_send_all("This is a chat message to all players")
 minetest.register_on_joinplayer(
     function(player)
         minetest.chat_send_all("Give a warm welcome to " .. player:get_player_name() .. "!")
-        aPlayer.playerobj = player
-
+        aPlayer.reference = player
+        aPlayer.initialised = false
         http_api.fetch(
             {
                 url = "http://localhost:3001/test",
@@ -60,29 +60,18 @@ minetest.register_on_joinplayer(
             },
             function(res)
                 print(res.data)
-                local decoded = minetest.parse_json(res.data)
-                print("Group Boundary X1 = " .. decoded["Group"]["GroupBoundary"]["X1"])
-                -- aPlayer.spawn.x = res.data.Group.GroupSpawnPoint.X
-                -- aPlayer.spawn.y = res.data.Group.GroupSpawnPoint.Y
-                -- aPlayer.spawn.z = res.data.Group.GroupSpawnPoint.Z
-                -- aPlayer.boundaries.x1 = res.data.Group.GroupBoundary.X1
-                -- aPlayer.boundaries.x2 = res.data.Group.GroupBoundary.x2
-                -- aPlayer.boundaries.z1 = res.data.Group.GroupBoundary.Z1
-                -- aPlayer.boundaries.z2 = res.data.Group.GroupBoundary.Z2
+                setPlayerConfiguration(res.data)
             end
         )
-
-        aPlayer.playerobj:setpos({x = 0, y = 10, z = 0})
     end
 )
 
 minetest.register_on_chat_message(
     function(name, message)
-        if name == "singleplayer" and message == "home" then
-            minetest.chat_send_all("setting position")
-            aPlayer:setpos({x = 0, y = 10, z = 0})
-            local currentPosition = aPlayer:getpos()
-            print(currentPosition.x)
+        if message == "generatearea" then
+            minetest.chat_send_all("generating area")
+            generateArea()
+            aPlayer.reference:setpos({x = 0, y = 10, z = 0})
         end
     end
 )
@@ -90,6 +79,13 @@ minetest.register_on_chat_message(
 -- Check boundary so that player cant walk outside designated area
 minetest.register_globalstep(
     function(dtime)
+        if aPlayer.configuration ~= nil and aPlayer.initialised == false then
+            print("Group Boundary X2 = " .. aPlayer.configuration["Group"]["GroupBoundary"]["X2"])
+            aPlayer.reference:setpos({x = 0, y = 10, z = 0})
+            aPlayer.initialised = true
+            print("Player Initialised")
+        end
+
         for _, p in ipairs(minetest.get_connected_players()) do
             local currentPosition = p:getpos()
             if currentPosition.x > boundaries.x1 then
@@ -117,4 +113,31 @@ function minetest.node_dig(pos, node, digger)
     print(pos.x)
     return old_node_dig(pos, node, digger)
     -- end
+end
+
+function setPlayerConfiguration(data)
+    aPlayer.configuration = minetest.parse_json(data)
+    print("Group Boundary X2 = " .. aPlayer.configuration["Group"]["GroupBoundary"]["X2"])
+end
+
+function generateArea()
+    local firstLayer = true
+    local blockToGenerate = "default:dirt_with_grass"
+    for xval = -10, 10, 1 do
+        for yval = -5, 0, 1 do
+            for zval = -10, 10, 1 do
+                minetest.set_node({x = xval, y = yval, z = zval}, {name = blockToGenerate})
+            end
+        end
+    end
+
+    local firstLayer = true
+    local blockToGenerate = "default:dirt_with_grass"
+    for xval = 12, 22, 1 do
+        for yval = -5, 0, 1 do
+            for zval = -10, 10, 1 do
+                minetest.set_node({x = xval, y = yval, z = zval}, {name = blockToGenerate})
+            end
+        end
+    end
 end

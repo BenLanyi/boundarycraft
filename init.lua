@@ -1,12 +1,24 @@
 print("Mod Loaded")
 
-local aPlayer = nil
 local boundaries = {
     x1 = 5,
     x2 = -5,
     z1 = 5,
     z2 = -5
 }
+
+local defaultSpawn = {
+    x = 0,
+    y = 0,
+    z = 500
+}
+
+local aPlayer = {
+    playerobj = nil,
+    --boundaries = defaultBoundaries,
+    spawn = defaultSpawn
+}
+
 local http_api = minetest.request_http_api()
 if not http_api then
     print("ERROR: in minetest.conf, this mod must be in secure.http_mods!")
@@ -29,8 +41,7 @@ minetest.chat_send_all("This is a chat message to all players")
 minetest.register_on_joinplayer(
     function(player)
         minetest.chat_send_all("Give a warm welcome to " .. player:get_player_name() .. "!")
-        aPlayer = player
-        aPlayer:setpos({x = 0, y = 10, z = 0})
+        aPlayer.playerobj = player
 
         http_api.fetch(
             {
@@ -41,6 +52,27 @@ minetest.register_on_joinplayer(
                 print(res.data)
             end
         )
+        -- get player data from api
+        http_api.fetch(
+            {
+                url = "http://localhost:3001/player",
+                post_data = '{ "Message" : "blah#1234"}'
+            },
+            function(res)
+                print(res.data)
+                local decoded = minetest.parse_json(res.data)
+                print("Group Boundary X1 = " .. decoded["Group"]["GroupBoundary"]["X1"])
+                -- aPlayer.spawn.x = res.data.Group.GroupSpawnPoint.X
+                -- aPlayer.spawn.y = res.data.Group.GroupSpawnPoint.Y
+                -- aPlayer.spawn.z = res.data.Group.GroupSpawnPoint.Z
+                -- aPlayer.boundaries.x1 = res.data.Group.GroupBoundary.X1
+                -- aPlayer.boundaries.x2 = res.data.Group.GroupBoundary.x2
+                -- aPlayer.boundaries.z1 = res.data.Group.GroupBoundary.Z1
+                -- aPlayer.boundaries.z2 = res.data.Group.GroupBoundary.Z2
+            end
+        )
+
+        aPlayer.playerobj:setpos({x = 0, y = 10, z = 0})
     end
 )
 

@@ -1,3 +1,5 @@
+dofile(minetest.get_modpath("boundarycraft") .. "/zones.lua")
+
 print("Mod Loaded")
 
 local playerList = {}
@@ -28,50 +30,75 @@ if not http_api then
     print("ERROR: in minetest.conf, this mod must be in secure.http_mods!")
 end
 
-minetest.register_chatcommand(
-    "foo",
-    {
-        privs = {
-            interact = true
-        },
-        func = function(name, param)
-            return true, "You said " .. param .. "!"
+-- Handle login form submission
+minetest.register_on_player_receive_fields(
+    function(player, formname, fields)
+        if formname == "mymod:login" then
+            if fields.token ~= nil then
+                print("token: " .. fields.token)
+                verifyToken(fields.token, player)
+                return true
+            else
+                -- sends invalid token to enable handling of escape from form
+                verifyToken("x", player)
+            end
         end
-    }
-)
 
-minetest.chat_send_all("This is a chat message to all players")
+        return false
+    end
+)
 
 -- Sets up player configuration from server data
 minetest.register_on_joinplayer(
     function(player)
-        minetest.chat_send_all("Give a warm welcome to " .. player:get_player_name() .. "!")
-
         aPlayer.reference = player
-        print("player name " .. player:get_player_name())
         aPlayer.initialised = false
-        http_api.fetch(
-            {
-                url = "http://localhost:3001/test",
-                post_data = '{ "Message" : "message from minetest"}'
-            },
-            function(res)
-                print(res.data)
-            end
-        )
-        -- get player data from api
-        http_api.fetch(
-            {
-                url = "http://localhost:3001/player",
-                post_data = '{ "Message" : "blah-1234"}'
-            },
-            function(res)
-                print(res.data)
-                setPlayerConfiguration(res.data)
-            end
+        -- Show Login Window
+        minetest.show_formspec(
+            player:get_player_name(),
+            "mymod:login",
+            "size[10,6]" ..
+                "label[0,0;Hello, " ..
+                    player:get_player_name() ..
+                        "]" ..
+                            "label[0,1;Please enter your login key to continue ]" ..
+                                "field[1,3;3,1;token;Key;]" .. "button_exit[1,3.5;2,1;exit;Login]"
         )
     end
 )
+
+function verifyToken(token, player)
+    http_api.fetch(
+        {
+            url = "http://localhost:3001/auth",
+            post_data = '{ "Token" : "' .. token .. '"}'
+        },
+        function(res)
+            print(dump(res.data))
+            local fetchResult = minetest.parse_json(res.data)
+            print("fetch result" .. dump(fetchResult))
+            if fetchResult == "authenticated" then
+                print("auth success")
+                aPlayer.reference = player
+                print("player name " .. player:get_player_name())
+                -- get player data from api
+                http_api.fetch(
+                    {
+                        url = "http://localhost:3001/player",
+                        post_data = '{ "Message" : "blah-1234"}'
+                    },
+                    function(res)
+                        print(res.data)
+                        setPlayerConfiguration(res.data)
+                    end
+                )
+            else
+                print("auth failed")
+                minetest.kick_player(player:get_player_name(), "Invalid Token")
+            end
+        end
+    )
+end
 
 -- Set chat message commands
 minetest.register_on_chat_message(
@@ -102,13 +129,14 @@ minetest.register_on_chat_message(
 -- Check boundary so that player cant walk outside designated area
 minetest.register_globalstep(
     function(dtime)
-        -- Set player configuration once it is loaded in from fetch
-        if aPlayer.configuration ~= nil and aPlayer.initialised == false then
-            print("Group Boundary X2 = " .. aPlayer.configuration["Group"]["GroupBoundary"]["X2"])
-            aPlayer.reference:setpos({x = 0, y = 10, z = 0})
-            aPlayer.initialised = true
-            print("Player Initialised")
+        -- when player joins game hold them in the sky until they are initialised
+        if aPlayer.reference ~= nil and aPlayer.initialised == false then
+            aPlayer.reference:setpos({x = 0, y = 29000, z = 0})
         end
+        -- -- Set player configuration once it is loaded in from fetch
+        -- if aPlayer.configuration ~= nil and aPlayer.initialised == true then
+        --     print("Group Boundary X2 = " .. aPlayer.configuration["Group"]["GroupBoundary"]["X2"])
+        -- end
 
         -- for _, p in ipairs(minetest.get_connected_players()) do
         --     local currentPosition = p:getpos()
@@ -141,99 +169,12 @@ end
 
 function setPlayerConfiguration(data)
     aPlayer.configuration = minetest.parse_json(data)
-    print("Group Boundary X2 = " .. aPlayer.configuration["Group"]["GroupBoundary"]["X2"])
-end
+    print("Group Boundary X1 = " .. aPlayer.configuration["Group"]["GroupBoundary"]["X1"])
+    aPlayer.initialised = true
+    print("Player Initialised")
+    -- local xval = aPlayer.configuration["Group"]["SpawnPoint"]["X"]
+    -- local yval = aPlayer.configuration["Group"]["SpawnPoint"]["Y"]
+    -- local zval = aPlayer.configuration["Group"]["SpawnPoint"]["Z"]
 
--- Generates landmass with trees etc.
-function generateArea(x1, x2, y, z1, z2)
-    clearAreaSurface(x1, x2, y, z1, z2)
-
-    generateLand(x1, x2, y, z1, z2)
-    default.grow_new_pine_tree({x = x1 + 1, y = y + 1, z = z1 + 1})
-    default.grow_new_apple_tree({x = x1 + 2, y = y + 1, z = z1 + 7})
-    default.grow_new_apple_tree({x = x1 + 5, y = y + 1, z = z1 + 7})
-    default.grow_new_apple_tree({x = z1 + 4, y = y + 1, z = z1 + 4})
-    default.grow_new_apple_tree({x = x1 + 6, y = y + 1, z = z1 + 1})
-
-    generateLake(x2 - 4, x2 - 1, y, z2 - 5, z2 - 1)
-    generateGrass(x1, x2, y, z1, z2)
-
-    --generateLand(x2 + 2, x2 + 12, y, z1, z2)
-end
-
--- Clears surface of land mass, anything above level 0
-function clearAreaSurface(x1, x2, y, z1, z2)
-    local blockToGenerate = "air"
-    for xval = x1, x2, 1 do
-        for yval = y + 0.5, y + 100, 1 do
-            for zval = z1, z2, 1 do
-                minetest.set_node({x = xval, y = yval, z = zval}, {name = blockToGenerate})
-            end
-        end
-    end
-end
-
--- Generates land mass
-function generateLand(x1, x2, y, z1, z2)
-    -- Top layer with grass
-    local blockToGenerate = "default:dirt_with_grass"
-    for xval = x1, x2, 1 do
-        for zval = z1, z2, 1 do
-            minetest.set_node({x = xval, y = y, z = zval}, {name = blockToGenerate})
-        end
-    end
-    -- Middle layer of dirt
-    local blockToGenerate = "default:dirt"
-    for xval = x1, x2, 1 do
-        for yval = y - 5, y - 1, 1 do
-            for zval = z1, z2, 1 do
-                minetest.set_node({x = xval, y = yval, z = zval}, {name = blockToGenerate})
-            end
-        end
-    end
-    -- bedrock of obsidian, may need to make indestructable
-    local blockToGenerate = "default:obsidian"
-    for xval = x1, x2, 1 do
-        for zval = z1, z2, 1 do
-            minetest.set_node({x = xval, y = y - 6, z = zval}, {name = blockToGenerate})
-        end
-    end
-end
-
--- Destroys land mass
-function emptyWorld()
-    local blockToGenerate = "air"
-    for xval = -10, 10, 1 do
-        for yval = -10, 20, 1 do
-            for zval = -10, 10, 1 do
-                minetest.set_node({x = xval, y = yval, z = zval}, {name = blockToGenerate})
-            end
-        end
-    end
-end
-
--- Generates grass in random spots within area.
--- Checks nothing already exists in position and dirt with grass is below
-function generateGrass(x1, x2, y, z1, z2)
-    local xval = nil
-    local zval = nil
-    for passes = 1, 10, 1 do
-        xval = math.random(x1, x2)
-        zval = math.random(z1, z2)
-        currentNode = minetest.get_node({x = xval, y = y + 1, z = zval})
-        nodeBelow = minetest.get_node({x = xval, y = y, z = zval})
-        print(nodeBelow.name)
-        if currentNode.name == "air" and nodeBelow.name == "default:dirt_with_grass" then
-            print("grass generated")
-            minetest.set_node({x = xval, y = y + 1, z = zval}, {name = "default:grass_1"})
-        end
-    end
-end
-
-function generateLake(x1, x2, y, z1, z2)
-    for xval = x1, x2, 1 do
-        for zval = z1, z2, 1 do
-            minetest.set_node({x = xval, y = y, z = zval}, {name = "default:water_source"})
-        end
-    end
+    aPlayer.reference:setpos({x = 0, y = 15, z = 0})
 end

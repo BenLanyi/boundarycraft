@@ -58,18 +58,20 @@ function verifyToken(token, player)
         },
         function(res)
             local fetchResult = minetest.parse_json(res.data)
-            if fetchResult == "authenticated" then
-                minetest.log("action", player:get_player_name() .. " connected with valid token")
+            print(dump(fetchResult))
+            if fetchResult.Response == "authenticated" then
                 -- get player data from api
-                http_api.fetch(
-                    {
-                        url = "http://localhost:3001/player",
-                        post_data = '{ "Message" : "blah-1234"}'
-                    },
-                    function(res)
-                        setPlayerConfiguration(res.data, player)
-                    end
-                )
+                -- http_api.fetch(
+                --     {
+                --         url = "http://localhost:3001/player",
+                --         post_data = '{ "Message" : "blah-1234"}'
+                --     },
+                --     function(res)
+                --         setPlayerConfiguration(res.data, player)
+                --     end
+                -- )
+                minetest.log("action", player:get_player_name() .. " connected with valid token")
+                setPlayerConfiguration(fetchResult.PlayerData, player)
             else
                 minetest.log("action", player:get_player_name() .. " was kicked due to invalid token")
                 minetest.kick_player(player:get_player_name(), "Invalid Token")
@@ -140,7 +142,7 @@ end
 function setPlayerConfiguration(data, player)
     local thisPlayer = {
         reference = player,
-        configuration = minetest.parse_json(data),
+        configuration = data,
         initialised = true
     }
     playerList[player:get_player_name()] = thisPlayer

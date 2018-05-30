@@ -154,6 +154,15 @@ function setPlayerConfiguration(data, player)
             z = thisPlayer.configuration.Group.GroupSpawnPoint.Z
         }
     )
+    --generate area
+    generateArea(
+        thisPlayer.configuration.Group.GroupBoundary.X1,
+        thisPlayer.configuration.Group.GroupBoundary.X2,
+        8,
+        thisPlayer.configuration.Group.GroupBoundary.Z1,
+        thisPlayer.configuration.Group.GroupBoundary.Z2
+    )
+    --end generate area
 end
 
 -- Set chat message commands

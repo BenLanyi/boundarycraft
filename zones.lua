@@ -9,6 +9,7 @@ function generateArea(x1, x2, y, z1, z2)
     default.grow_new_apple_tree({x = z1 + 4, y = y + 1, z = z1 + 4})
     default.grow_new_apple_tree({x = x1 + 6, y = y + 1, z = z1 + 1})
 
+    generateFence(x1, x2, y + 1, z1, z2)
     generateLake(x2 - 4, x2 - 1, y, z2 - 5, z2 - 1)
     generateGrass(x1, x2, y, z1, z2)
 
@@ -45,25 +46,13 @@ function generateLand(x1, x2, y, z1, z2)
             end
         end
     end
-    -- bedrock of obsidian, may need to make indestructable
-    local blockToGenerate = "default:obsidian"
-    for xval = x1, x2, 1 do
-        for zval = z1, z2, 1 do
-            minetest.set_node({x = xval, y = y - 6, z = zval}, {name = blockToGenerate})
-        end
-    end
-end
-
--- Destroys land mass
-function emptyWorld()
-    local blockToGenerate = "air"
-    for xval = -10, 10, 1 do
-        for yval = -10, 20, 1 do
-            for zval = -10, 10, 1 do
-                minetest.set_node({x = xval, y = yval, z = zval}, {name = blockToGenerate})
-            end
-        end
-    end
+    -- -- bedrock of obsidian, may need to make indestructable
+    -- local blockToGenerate = "default:obsidian"
+    -- for xval = x1, x2, 1 do
+    --     for zval = z1, z2, 1 do
+    --         minetest.set_node({x = xval, y = y - 6, z = zval}, {name = blockToGenerate})
+    --     end
+    -- end
 end
 
 -- Generates grass in random spots within area.
@@ -89,5 +78,32 @@ function generateLake(x1, x2, y, z1, z2)
         for zval = z1, z2, 1 do
             minetest.set_node({x = xval, y = y, z = zval}, {name = "default:water_source"})
         end
+    end
+end
+
+-- -- creates unbreakable version of the fence
+-- minetest.register_node(
+--     "boundarycraft:boundary_fence",
+--     {
+--         description = "Boundary Fence",
+--         texture = "default_fence_wood.png",
+--         material = "default:wood",
+--         groups = {unbreakable = 1},
+--         sounds = default.node_sound_wood_defaults()
+--     }
+-- )
+
+function generateFence(x1, x2, y, z1, z2)
+    for xval = x1, x2, 1 do
+        minetest.set_node({x = xval, y = y, z = z1}, {name = "default:fence_wood"})
+    end
+    for xval = x1, x2, 1 do
+        minetest.set_node({x = xval, y = y, z = z2}, {name = "default:fence_wood"})
+    end
+    for zval = z1, z2, 1 do
+        minetest.set_node({x = x1, y = y, z = zval}, {name = "default:fence_wood"})
+    end
+    for zval = z1, z2, 1 do
+        minetest.set_node({x = x2, y = y, z = zval}, {name = "default:fence_wood"})
     end
 end
